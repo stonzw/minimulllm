@@ -14,7 +14,9 @@ dependencies = [
     "pydantic>=2.10.4",
 ]
 
-# どのフォルダをモジュールとして扱うかを書きます。
+[tool.poetry.packages]
+include = ["src"]
+
 [tool.setuptools]
 py-modules = ["src"]
 

@@ -1,6 +1,6 @@
 import subprocess
 from typing import List, Dict
-from .tools import CodeGenerator
+from .client import CodeGenerator
 from .type import Code, Agent
 
 class CodeInterpreterFlow:

@@ -4,7 +4,7 @@ import google.generativeai as genai
 from typing import List, Optional
 from pydantic import BaseModel
 
-from minimulllm.const import JSON_PARSER_PROMPT
+from .prompt import JSON_PARSER_PROMPT
 from .type import Code, Agent, Message, CodeGenerator
 from .secret import OPENAI_API_KEY, DEEP_SEEK_API_KEY
 
