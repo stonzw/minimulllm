@@ -1,7 +1,11 @@
 import subprocess
-from typing import List, Dict
+import openai
+from pydantic import BaseModel
+from typing import Generic, List, Dict, TypeVar
+from .client import call_openai_structured_api
 from .client import CodeGenerator
 from .type import Code, Agent
+from .secret import OPENAI_API_KEY
 
 class CodeInterpreterFlow:
     @staticmethod
@@ -123,3 +127,40 @@ class TreeFlow:
         next_prompt = TreeFlow.merge_answers(answers, roles)
         # manager に渡して終了
         return manager.chat(next_prompt)
+    
+FORMAT_T = TypeVar('FORMAT_T', bound=BaseModel)
+class FormatFlow(Generic[FORMAT_T]):
+    def __init__(self, model_class: type[FORMAT_T]):
+        self.model_class = model_class
+    
+    def format(self, raw_message: str) -> FORMAT_T:
+        openai.api_key = OPENAI_API_KEY
+        messages = [
+            {"role": "system", "content": "You are JSON parser, don't rewrite content just parse it."},
+            {"role": "user", "content": "parse following.: \n" + raw_message},
+        ]
+        response = call_openai_structured_api("gpt-4o-mini", messages, self.model_class)
+        return response.choices[0].message.parsed
+
+    def run(self, agent, prompt: str) -> FORMAT_T:
+        raw_message = agent.chat(prompt)
+        return self.format(raw_message)
+
+SJON_T = TypeVar('SJON_T', bound=BaseModel)
+class StructuredJSONFlow(Generic[SJON_T]):
+    def __init__(self, model_class: type[SJON_T]):
+        self.model_class = model_class
+    
+    def format(self, raw_message: str) -> SJON_T:
+        params = eval(raw_message[raw_message.find("{"):raw_message.rfind("}") + 1])
+        return self.model_class(**params)
+
+    def run(self, agent, prompt: str, max_retry: int=3) -> SJON_T:
+        schema = self.model_class.model_json_schema()
+        JSON_PROMPT_TEMPLATE = "{prompt}\n\nOutput format is JSON.schema is \n\n{schema}"
+        raw_message = agent.chat(JSON_PROMPT_TEMPLATE.format(prompt=prompt, schema=schema))
+        for _ in range(max_retry):
+            try:
+                return self.format(raw_message)
+            except Exception:
+                raw_message = agent.chat("this output is not valid JSON. Please try again and Must be this output format\n\n{schema}")
