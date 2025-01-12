@@ -1,52 +1,8 @@
 import os
 import fnmatch
-from typing import Callable, List, Dict, Any, get_type_hints
+from typing import List, Dict, Any
+from .function_call import doc
 
-
-def doc(doc_dict: Dict[str, Any]):
-    """
-    関数に構造化されたドキュメントを追加するデコレーター。型情報は型ヒントから取得します。
-
-    Args:
-        doc_dict (Dict[str, Any]): ドキュメントの情報を含む辞書。
-            - "description": 関数の説明
-            - "args": 引数の説明（キーは引数名、値は説明文）
-            - "returns": 戻り値の説明（文字列）
-            - "raises": 例外の説明（キーは例外タイプ、値は説明文）
-
-    Returns:
-        Callable: デコレートされた関数
-    """
-    def decorator(func: Callable):
-        # 型ヒントを取得
-        type_hints = get_type_hints(func)
-
-        # ドキュメントを構築
-        docstring = f"{doc_dict.get('description', '')}\n\n"
-        
-        # 引数の説明
-        if "args" in doc_dict:
-            docstring += "Args:\n"
-            for arg, desc in doc_dict["args"].items():
-                arg_type = type_hints.get(arg, "Unknown")
-                docstring += f"    {arg} ({arg_type.__name__}): {desc}\n"
-        
-        # 戻り値の説明
-        if "returns" in doc_dict:
-            return_type = type_hints.get("return", "Unknown")
-            docstring += "\nReturns:\n"
-            docstring += f"    {return_type.__name__}: {doc_dict['returns']}\n"
-        
-        # 例外の説明
-        if "raises" in doc_dict:
-            docstring += "\nRaises:\n"
-            for exc, desc in doc_dict["raises"].items():
-                docstring += f"    {exc}: {desc}\n"
-        
-        # 関数の__doc__属性に設定
-        func.__doc__ = docstring
-        return func
-    return decorator
 
 @doc({
     "description": "指定されたファイルの内容を読み取ります。",
@@ -110,41 +66,6 @@ def explore_directory(
     _explore(directory_path, 1)
     return results
 
-def _parse_gitignore(directory_path: str) -> List[str]:
-    """
-    .gitignore ファイルをパースし、無視するパターンのリストを返す。
-
-    Args:
-        directory_path (str): .gitignore ファイルがあるディレクトリのパス
-
-    Returns:
-        List[str]: 無視するパターンのリスト
-    """
-    gitignore_path = os.path.join(directory_path, ".gitignore")
-    if not os.path.exists(gitignore_path):
-        return []
-
-    with open(gitignore_path, "r", encoding="utf-8") as file:
-        patterns = [line.strip() for line in file if line.strip() and not line.startswith("#")]
-    return patterns
-
-def _is_ignored(path: str, patterns: List[str]) -> bool:
-    """
-    指定されたパスが .gitignore のパターンにマッチするか確認する。
-
-    Args:
-        path (str): 確認するパス
-        patterns (List[str]): .gitignore のパターンリスト
-
-    Returns:
-        bool: 無視する場合は True、そうでない場合は False
-    """
-    relative_path = os.path.relpath(path, start=os.path.dirname(path))
-    for pattern in patterns:
-        if fnmatch.fnmatch(relative_path, pattern) or fnmatch.fnmatch(os.path.basename(path), pattern):
-            return True
-    return False
-
 @doc({
     "description": "指定されたディレクトリ内のファイルを再帰的に検索し、指定された文字列を含む行を返します。.gitignore を参照して無視するファイルやディレクトリをスキップできます。",
     "args": {
@@ -167,6 +88,41 @@ def search_in_files(
     case_sensitive: bool = False,
     use_gitignore: bool = True,
 ) -> List[Dict[str, Any]]:
+    def _parse_gitignore(directory_path: str) -> List[str]:
+        """
+        .gitignore ファイルをパースし、無視するパターンのリストを返す。
+
+        Args:
+            directory_path (str): .gitignore ファイルがあるディレクトリのパス
+
+        Returns:
+            List[str]: 無視するパターンのリスト
+        """
+        gitignore_path = os.path.join(directory_path, ".gitignore")
+        if not os.path.exists(gitignore_path):
+            return []
+
+        with open(gitignore_path, "r", encoding="utf-8") as file:
+            patterns = [line.strip() for line in file if line.strip() and not line.startswith("#")]
+        return patterns
+
+    def _is_ignored(path: str, patterns: List[str]) -> bool:
+        """
+        指定されたパスが .gitignore のパターンにマッチするか確認する。
+
+        Args:
+            path (str): 確認するパス
+            patterns (List[str]): .gitignore のパターンリスト
+
+        Returns:
+            bool: 無視する場合は True、そうでない場合は False
+        """
+        relative_path = os.path.relpath(path, start=os.path.dirname(path))
+        for pattern in patterns:
+            if fnmatch.fnmatch(relative_path, pattern) or fnmatch.fnmatch(os.path.basename(path), pattern):
+                return True
+        return False
+
     results = []
     ignore_patterns = _parse_gitignore(directory_path) if use_gitignore else []
 

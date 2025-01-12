@@ -1,6 +1,51 @@
 import json
 from typing import Callable, Optional, List, Dict, Any, get_origin, get_args, get_type_hints
 
+def doc(doc_dict: Dict[str, Any]):
+    """
+    関数に構造化されたドキュメントを追加するデコレーター。型情報は型ヒントから取得します。
+
+    Args:
+        doc_dict (Dict[str, Any]): ドキュメントの情報を含む辞書。
+            - "description": 関数の説明
+            - "args": 引数の説明（キーは引数名、値は説明文）
+            - "returns": 戻り値の説明（文字列）
+            - "raises": 例外の説明（キーは例外タイプ、値は説明文）
+
+    Returns:
+        Callable: デコレートされた関数
+    """
+    def decorator(func: Callable):
+        # 型ヒントを取得
+        type_hints = get_type_hints(func)
+
+        # ドキュメントを構築
+        docstring = f"{doc_dict.get('description', '')}\n\n"
+        
+        # 引数の説明
+        if "args" in doc_dict:
+            docstring += "Args:\n"
+            for arg, desc in doc_dict["args"].items():
+                arg_type = type_hints.get(arg, "Unknown")
+                docstring += f"    {arg} ({arg_type.__name__}): {desc}\n"
+        
+        # 戻り値の説明
+        if "returns" in doc_dict:
+            return_type = type_hints.get("return", "Unknown")
+            docstring += "\nReturns:\n"
+            docstring += f"    {return_type.__name__}: {doc_dict['returns']}\n"
+        
+        # 例外の説明
+        if "raises" in doc_dict:
+            docstring += "\nRaises:\n"
+            for exc, desc in doc_dict["raises"].items():
+                docstring += f"    {exc}: {desc}\n"
+        
+        # 関数の__doc__属性に設定
+        func.__doc__ = docstring
+        return func
+    return decorator
+
 class LLMToolParser:
     """
     LLMの関数呼び出しのために関数を解析・バリデーションするユーティリティクラス。

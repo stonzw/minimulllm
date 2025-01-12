@@ -1,7 +1,7 @@
 import openai
 import anthropic
 import google.generativeai as genai
-from typing import List, Optional
+from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 
 from .prompt import JSON_PARSER_PROMPT
@@ -87,7 +87,16 @@ class CodeGeneratorDeepSeek(DeepSeek):
         response = call_openai_structured_api("gpt-4o-mini", messages, Command)
         return response.choices[0].message.parsed
 
-
+class DeepSeekToolUse(DeepSeek):
+    def tool(self, message: str, tools: List[Dict[str, Any]])->str:
+        self._messages.append({"role": "user", "content": message})
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=self._messages,
+            tools=tools
+        )
+        self._messages.append({"role": "assistant", "content": response.choices[0].message.content})
+        return response
 
 class Anthropic(Agent):
 
