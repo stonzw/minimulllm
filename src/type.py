@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pydantic import BaseModel, Field
-from typing import Optional, List, Any
+from typing import Optional, List, Dict, Any
 
 class Command(BaseModel):
     answer: str = Field(description="answer.")
@@ -44,6 +44,14 @@ class Agent(ABC):
 class CodeGenerator(Agent):
     @abstractmethod
     def code(self, message: str)->Command:
+        """
+        ユーザーからの入力（message）を受け取り、適切な応答を返すメソッド。
+        """
+        pass
+
+class ToolUse(Agent):
+    @abstractmethod
+    def tool(self, message: str, tools: List[Dict[str, Any]])->str:
         """
         ユーザーからの入力（message）を受け取り、適切な応答を返すメソッド。
         """
