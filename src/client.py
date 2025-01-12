@@ -5,7 +5,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from .prompt import JSON_PARSER_PROMPT
-from .type import Code, Agent, Message, CodeGenerator
+from .type import Command, Agent, Message, CodeGenerator
 from .secret import OPENAI_API_KEY, DEEP_SEEK_API_KEY
 
 
@@ -34,10 +34,10 @@ class CodeGeneratorOpenAI(CodeGenerator):
         self._messages.append({"role": "assistant", "content": response.choices[0].message.content})
         return response.choices[0].message.content
 
-    def code(self, message) -> Optional[Code]:
+    def code(self, message) -> Optional[Command]:
         openai.api_key = OPENAI_API_KEY
         self._messages.append({"role": "user", "content": message})
-        response = call_openai_structured_api(self.model, self._messages, Code)
+        response = call_openai_structured_api(self.model, self._messages, Command)
         self._messages.append({"role": "assistant", "content": response.choices[0].message.content})
         return response.choices[0].message.parsed
 
@@ -76,7 +76,7 @@ class DeepSeek(Agent):
             ) for m in self._messages
         ]
 class CodeGeneratorDeepSeek(DeepSeek):
-    def code(self, message) -> Optional[Code]:
+    def code(self, message) -> Optional[Command]:
         self.chat(message)
         openai.api_key = OPENAI_API_KEY
         raw_message = self.messages[-1].content
@@ -84,7 +84,7 @@ class CodeGeneratorDeepSeek(DeepSeek):
             {"role": "system", "content": "You are JSON parser, don't rewrite content just parse it."},
             {"role": "user", "content": "parse following.: \n" + raw_message},
         ]
-        response = call_openai_structured_api("gpt-4o-mini", messages, Code)
+        response = call_openai_structured_api("gpt-4o-mini", messages, Command)
         return response.choices[0].message.parsed
 
 
@@ -142,7 +142,7 @@ class Anthropic(Agent):
 
 
 class CodeGeneratorAnthropic(Anthropic):
-    def code(self, message) -> Optional[Code]:
+    def code(self, message) -> Optional[Command]:
         self.chat(message)
         openai.api_key = OPENAI_API_KEY
         raw_message = self.messages[-1].content
@@ -150,7 +150,7 @@ class CodeGeneratorAnthropic(Anthropic):
             {"role": "system", "content": "You are JSON parser, don't rewrite content just parse it."},
             {"role": "user", "content": "parse following.: \n" + raw_message},
         ]
-        response = call_openai_structured_api("gpt-4o-mini", messages, Code)
+        response = call_openai_structured_api("gpt-4o-mini", messages, Command)
         return response.choices[0].message.parsed
 
 class Gemini(Agent):
@@ -182,7 +182,7 @@ class Gemini(Agent):
         ]
 
 class CodeGeneratorGemini(Gemini):
-    def code(self, message) -> Optional[Code]:
+    def code(self, message) -> Optional[Command]:
         self.chat(message)
         openai.api_key = OPENAI_API_KEY
         raw_message = self.messages[-1].content
@@ -190,7 +190,7 @@ class CodeGeneratorGemini(Gemini):
             {"role": "system", "content": JSON_PARSER_PROMPT},
             {"role": "user", "content": "parse following.: \n" + raw_message},
         ]
-        response = call_openai_structured_api("gpt-4o-mini", messages, Code)
+        response = call_openai_structured_api("gpt-4o-mini", messages, Command)
         return response.choices[0].message.parsed
 
 

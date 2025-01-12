@@ -2,11 +2,15 @@ from abc import ABC, abstractmethod
 from pydantic import BaseModel, Field
 from typing import Optional, List, Any
 
-class Code(BaseModel):
+class Command(BaseModel):
     answer: str = Field(description="answer.")
     action: str = Field(description="action is wait or code or complete.")
     code: Optional[str] = Field(description="if execute code.write code to execute.code only.")
     language: Optional[str] = Field(description="The language of the code.python or bash.")
+
+class NewCode(BaseModel):
+    answer: str = Field(description="answer.")
+    code: Optional[str] = Field(description="whole code.write code.code only.")
 
 class Message(BaseModel):
     """標準化されたメッセージ型"""
@@ -39,7 +43,7 @@ class Agent(ABC):
 
 class CodeGenerator(Agent):
     @abstractmethod
-    def code(self, message: str)->Code:
+    def code(self, message: str)->Command:
         """
         ユーザーからの入力（message）を受け取り、適切な応答を返すメソッド。
         """

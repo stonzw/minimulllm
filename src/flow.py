@@ -1,15 +1,15 @@
-import subprocess
+import json
 import openai
+import subprocess
 from pydantic import BaseModel
 from typing import Generic, List, Dict, TypeVar
 from .client import call_openai_structured_api
-from .client import CodeGenerator
-from .type import Code, Agent
+from .type import Command, Agent
 from .secret import OPENAI_API_KEY
 
 class CodeInterpreterFlow:
     @staticmethod
-    def get_next_prompt(response: Code) -> str:
+    def get_next_prompt(response: Command) -> str:
         """
         response の内容に応じて次のプロンプト文字列を生成する。
         (副作用: input や subprocess.run を行う)
@@ -39,13 +39,13 @@ class CodeInterpreterFlow:
         return response.answer
 
     @staticmethod
-    def run(agent: CodeGenerator, purpose: str) -> str:
+    def run(agent: Agent, purpose: str) -> str:
         """
         フロー全体を制御する静的メソッド。
         agent, purpose はすべて引数で受け取り、内部状態を持たない。
         """
-        # はじめに agent に問い合わせて初回のレスポンスを取得
-        response = agent.code(purpose)
+        # はじめに agent に問い合わせて初回のレスポンスを取得 
+        response = StructuredJSONFlow(Command).run(agent, purpose)
 
         while True:
             # 生成されたコード (response.code) があれば表示しておく
@@ -70,9 +70,10 @@ class CodeInterpreterFlow:
 
             # 次の問い合わせ内容を生成
             next_prompt = CodeInterpreterFlow.get_next_prompt(response)
+            print("next_prompt:", next_prompt)
 
             # ここで次の問い合わせを agent に投げて、新たな response を得る
-            response = agent.code(next_prompt)
+            response = StructuredJSONFlow(Command).run(agent, next_prompt)
         return response.model_dump()
 
 
@@ -152,7 +153,7 @@ class StructuredJSONFlow(Generic[SJON_T]):
         self.model_class = model_class
     
     def format(self, raw_message: str) -> SJON_T:
-        params = eval(raw_message[raw_message.find("{"):raw_message.rfind("}") + 1])
+        params = json.loads(raw_message[raw_message.find("{"):raw_message.rfind("}") + 1])
         return self.model_class(**params)
 
     def run(self, agent, prompt: str, max_retry: int=3) -> SJON_T:
@@ -162,5 +163,6 @@ class StructuredJSONFlow(Generic[SJON_T]):
         for _ in range(max_retry):
             try:
                 return self.format(raw_message)
-            except Exception:
+            except Exception as e:
+                print("Error:", e)
                 raw_message = agent.chat("this output is not valid JSON. Please try again and Must be this output format\n\n{schema}")
