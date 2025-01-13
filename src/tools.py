@@ -162,3 +162,25 @@ def search_in_files(
     _explore(directory_path, 1)
     return results
 
+@doc({
+    "description": "作業が完了したら呼んでください。",
+    "args": {},
+    "returns": "COMPLETE",
+    "raises": {},
+})
+def complete() -> str:
+    return "COMPLETE"
+
+
+@doc({
+    "description": "ユーザーからの入力を受け取ります。",
+    "args": {
+        "message": "ユーザーへ表示するメッセージinputの引数",
+    },
+    "returns": "COMPLETE",
+    "raises": {},
+})
+def user_input(
+    message: str,
+) -> str:
+    return input(message)
