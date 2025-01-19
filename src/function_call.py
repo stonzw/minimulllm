@@ -1,5 +1,5 @@
 import json
-from typing import Callable, Optional, List, Dict, Any, get_origin, get_args, get_type_hints
+from typing import Callable, Optional, List, Dict, Any, Union, get_origin, get_args, get_type_hints
 
 def doc(doc_dict: Dict[str, Any]):
     """
@@ -199,24 +199,20 @@ class LLMToolParser:
             if param == "return":
                 continue
 
-            # Optional型を解析
-            if get_origin(param_type) is Optional:
-                param_type = get_args(param_type)[0]  # Optionalの中身を取得
+            # Optional[T] (Union[T, NoneType]) を含む場合
+            param_type = LLMToolParser.extract_non_none_type_if_optional(param_type)
 
-            # 型ヒントが無効な場合
-            if not isinstance(param_type, type):
-                raise ValueError(f"無効な型ヒントです: {param}: {param_type}")
-
-            # Pythonの型をJSON Schemaの型に変換
+            # JSON Schemaの型に変換
             json_schema_type = LLMToolParser.convert_python_type_to_json_schema_type(param_type)
 
             # 引数の説明を初期化(型ヒントのみ)
-            param_description = f"{param}: {param_type.__name__}"
+            param_description = f"{param}: {LLMToolParser.get_type_name(param_type)}"
 
-            # 引数の説明を取得（docstringから）
+            # docstringから引数の説明を取得
             if func.__doc__:
                 doc_lines = func.__doc__.splitlines()
                 for line in doc_lines:
+                    # 例: "param_name (int):" のような記述を探す場合
                     if f"{param} (" in line:
                         param_description = line.strip()
                         break
@@ -228,8 +224,35 @@ class LLMToolParser:
         return parameters
 
     @staticmethod
-    def convert_python_type_to_json_schema_type(python_type: type) -> str:
-        """Pythonの型をJSON Schemaの型に変換する。"""
+    def extract_non_none_type_if_optional(typ: Any) -> Any:
+        """
+        与えられた型が Optional[T] (Union[T, NoneType]) であれば、
+        NoneType 以外の型を取り出して返す。
+        それ以外の場合はそのまま返す。
+        """
+        type_origin = get_origin(typ)
+        type_args = get_args(typ)
+
+        # Optional[T] は Union[T, NoneType] なので、Union かつ NoneType を含むかで判定
+        if type_origin is Union and type(None) in type_args:
+            not_none_args = [arg for arg in type_args if arg is not type(None)]
+            if len(not_none_args) == 1:
+                return not_none_args[0]
+            else:
+                # Union[int, str, NoneType] のように複数が含まれる場合は追加対応が必要
+                raise ValueError(f"サポートされていない複数Union+NoneTypeです: {typ}")
+        return typ
+
+    @staticmethod
+    def convert_python_type_to_json_schema_type(python_type: Any) -> Any:
+        """
+        Pythonの型をJSON Schemaの型または構造に変換する。
+        Returns には dict もしくは str を返す想定。
+        """
+        type_origin = get_origin(python_type)
+        type_args = get_args(python_type)
+
+        # 組み込みのプリミティブ型
         if python_type is str:
             return "string"
         elif python_type is int:
@@ -238,37 +261,86 @@ class LLMToolParser:
             return "boolean"
         elif python_type is float:
             return "number"
-        elif python_type is list:
-            return "array"
-        elif python_type is dict:
-            return "object"
-        else:
-            raise ValueError(f"サポートされていない型です: {python_type}")
+
+        # list, dict のようなコンテナ型
+        if type_origin is list:
+            # 例: list[int]
+            if type_args:
+                item_type = LLMToolParser.convert_python_type_to_json_schema_type(type_args[0])
+            else:
+                item_type = {}
+            return {"type": "array", "items": item_type}
+        elif type_origin is dict:
+            # 例: dict[str, int]
+            if len(type_args) == 2:
+                key_type, value_type = type_args
+                # JSON Schema では key が string であることが多いが、
+                # Python の dict は key が str と限らないので注意 (今回は単純化)
+                return {
+                    "type": "object",
+                    "additionalProperties": LLMToolParser.convert_python_type_to_json_schema_type(value_type),
+                }
+            else:
+                return {"type": "object"}
+
+        # それ以外の Union 型 (Optional 以外)
+        if type_origin is Union:
+            # Optional[T] 以外の Union は未サポートとしてエラー
+            raise ValueError(f"サポートされていない複数Unionです: {python_type}")
+
+        # 何らかのクラス型など
+        # ここではサポート対象外としてエラーにする
+        raise ValueError(f"サポートされていない型です: {python_type}")
 
     @staticmethod
     def get_description(func: Callable, name: str) -> str:
-        """関数の説明を取得する。"""
+        """
+        関数の説明を取得する。
+        docstring がなければエラーを発生させ、docstring 追加例を出力する。
+        """
         if func.__doc__:
             return func.__doc__.strip()
         else:
             # docstringがない場合、エラーを発生させる
+            type_hints = get_type_hints(func)
+            # 引数の表示用
+            arg_text = ", ".join([
+                f"{p}: {t.__name__}" for p, t in type_hints.items() if p != 'return'
+            ])
+            return_type_name = type_hints['return'].__name__ if 'return' in type_hints else 'None'
+
             raise ValueError(
                 f"関数 '{name}' にdocstringがありません。以下のようにdocstringを追加してください:\n\n"
                 "現在の関数定義:\n"
-                f"def {name}({', '.join([f'{p}: {t.__name__}' for p, t in get_type_hints(func).items() if p != 'return'])}) -> {get_type_hints(func)['return'].__name__}:\n"
+                f"def {name}({arg_text}) -> {return_type_name}:\n"
                 "    # ここにdocstringを追加してください\n"
                 "    ...\n\n"
                 "例:\n"
-                f"def {name}({', '.join([f'{p}: {t.__name__}' for p, t in get_type_hints(func).items() if p != 'return'])}) -> {get_type_hints(func)['return'].__name__}:\n"
+                f"def {name}({arg_text}) -> {return_type_name}:\n"
                 '    """\n'
                 f"    {name} の説明をここに記述します。\n\n"
                 "    Args:\n"
-                f"        {' '.join([f'{p} ({t.__name__}): {p}の説明' for p, t in get_type_hints(func).items() if p != 'return'])}\n\n"
+                f"        {', '.join([f'{p} ({t.__name__}): {p}の説明' for p, t in type_hints.items() if p != 'return'])}\n\n"
                 "    Returns:\n"
-                f"        {get_type_hints(func)['return'].__name__}: 戻り値の説明\n"
+                f"        {return_type_name}: 戻り値の説明\n"
                 '    """\n'
                 "    ..."
             )
+
+    @staticmethod
+    def get_type_name(typ: Any) -> str:
+        """
+        Python の型オブジェクトや Union などから文字列表現を取り出す簡易ヘルパー。
+        """
+        type_origin = get_origin(typ)
+        type_args = get_args(typ)
+
+        if type_origin is Union:
+            # 例: Union[int, str] → "int | str"
+            return " | ".join(LLMToolParser.get_type_name(arg) for arg in type_args)
+        if isinstance(typ, type):
+            return typ.__name__
+        return str(typ)
 
 class LLMToolManager:
     def __init__(self):

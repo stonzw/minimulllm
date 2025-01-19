@@ -1,0 +1,71 @@
+import asyncio
+import json
+# from minimulllm.src.client import DeepSeek, DeepSeekToolUse
+
+from src.async_client import DeepSeekToolUse, OpenAIToolUse
+from src.client import OpenAI as OpenAISync
+from src.prompt import TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT
+from src.type import Agent
+from src.tools import explore_directory, search_in_files, file_read, file_write, complete, Reviewer
+from src.function_call import LLMToolManager
+
+async def code_generate(coder: Agent, reviewer: Reviewer, goal: str, max_steps: int):
+  tool_manager = LLMToolManager()
+  tool_manager.register(file_write)
+  tool_manager.register(file_read)
+  tool_manager.register(explore_directory)
+  tool_manager.register(search_in_files)
+  tool_manager.register(complete)
+  tool_manager.register(reviewer.review_code)
+  next_prompt = goal
+  for i in range(max_steps):
+    print(i)
+    if i % 5 == 1:
+      res = await coder.chat("状況を整理して計画を建ててください。詰まっていたら大胆に計画を修正してください。")
+    print(next_prompt)
+    res = await coder.tool(next_prompt, tool_manager.tools)
+    print(res)
+    function_calls = res.choices[0].message.tool_calls
+    if function_calls is None:
+      next_prompt = "function cannot call.If finish task call complete, not finish task call next function."
+    else:
+      for f in function_calls:
+        print("実行する関数:")
+        print(f.function.name)
+        print("引数:")
+        print(f.function.arguments)
+        yN = input("実行しますか?(y)次の指示を:")
+        if yN == "y":
+          try:
+            func_res = tool_manager.exec(f.function)
+            print("結果:")
+            print(func_res)
+            if func_res == "COMPLETE":
+              print("COMPLETE")
+              return
+            next_prompt = f"{f.function.name}({json.dumps(f.function.arguments)}) result is following: {clip_string(json.dumps(func_res), 10000)}"
+            print(len(next_prompt))
+          except Exception as e:
+            print(e)
+            next_prompt = f"Error following: {e}"
+        else:
+          next_prompt = yN
+
+async def main():
+  engineer = DeepSeekToolUse("deepseek-chat", TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT)
+  engineer = OpenAIToolUse("gpt-4o", TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT)
+  # qa_ds = DeepSeek("deepseek-chat", OPEN_INTERPRETER_SYSTEM_PROMPT)
+  qa_ds = DeepSeekToolUse("o1", TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT)
+  o1_engineer = OpenAISync("o1", TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT)
+
+  def clip_string(string: str, max_length: int):
+    if len(string) > max_length:
+      return string[:max_length - 3] + "\n output is too long ..."
+    return string
+
+  reviewer = Reviewer(o1_engineer)
+  goal = "I want to create a function that reads a file and returns the content as a string."
+  res = await code_generate(engineer, reviewer, goal, 100)
+
+if __name__ == "__main__":
+  asyncio.run(main())

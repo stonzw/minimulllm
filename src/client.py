@@ -16,6 +16,35 @@ def call_openai_structured_api(model: str, messages: List[dict], response_format
         response_format=response_format,
     )
     return response
+class OpenAI(Agent):
+    def __init__(self, model, system_prompt):
+        self.model = model
+        self.system_prompt = system_prompt
+        self._messages = [{"role": "system", "content": system_prompt}]
+        # OpenAI 用に仮想的に用意された "async" 版インターフェースを想定
+        self.client = openai.OpenAI(api_key=OPENAI_API_KEY)
+
+    def chat(self, message) -> str:
+        self._messages.append({"role": "user", "content": message})
+        # 非同期版
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=self._messages,
+        )
+        self._messages.append({
+            "role": "assistant",
+            "content": response.choices[0].message.content
+        })
+        return response.choices[0].message.content
+
+    @property
+    def messages(self) -> List[Message]:
+        return [
+            Message(
+                role=m["role"],
+                content=m["content"]
+            ) for m in self._messages
+        ]
 
 class CodeGeneratorOpenAI(CodeGenerator):
     OPEN_AI_MODELS = ["gpt-4o", "gpt-4o-mini", "o1-mini", "o1"]
