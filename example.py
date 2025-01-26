@@ -9,6 +9,11 @@ from src.type import Agent
 from src.tools import explore_directory, search_in_files, file_read, file_write, complete, make_dirs, user_input, Planner, CodeReviewer, TaskReviewer
 from src.function_call import LLMToolManager
 
+def clip_string(string: str, max_length: int):
+  if len(string) > max_length:
+    return string[:max_length - 3] + "\n output is too long ..."
+  return string
+
 async def code_generate(coder: Agent, planner: Planner, code_reviewer: CodeReviewer, task_reviewer: TaskReviewer, goal: str, max_steps: int):
   tool_manager = LLMToolManager()
   tool_manager.register(file_write)
