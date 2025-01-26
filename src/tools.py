@@ -47,6 +47,23 @@ def file_write(file_path: str, content: str) -> str:
     except IOError as e:
         raise IOError(f"ファイル '{file_path}' の書き込みに失敗しました: {e}")
 
+
+def make_dirs(path: str) -> None:
+    """
+    指定されたパスにディレクトリを再帰的に作成する。
+
+    Args:
+        path (str): 作成するディレクトリのパス
+
+    Raises:
+        OSError: ディレクトリの作成に失敗した場合
+    """
+    try:
+        os.makedirs(path, exist_ok=True)
+    except OSError as e:
+        raise OSError(f"ディレクトリ '{path}' の作成に失敗しました: {e}")
+
+
 @doc({
     "description": "指定されたディレクトリ内のファイルを検索します。",
     "args": {
@@ -240,7 +257,7 @@ def user_input(
     return input(message)
 
 
-class Reviewer:
+class CodeReviewer:
   def __init__(self, llm: Agent):
     self.llm = llm
 
@@ -260,4 +277,37 @@ class Reviewer:
       with open(filepath, "r") as f:
         code += code_markdown_template.format(filepath=filepath, code=f.read())
     res = self.llm.chat(f"Please find this code bug. \n code: ```\n{code}\n``` \n additional info: {additional_info}")
+    return res
+
+class TaskReviewer:
+  def __init__(self, llm: Agent):
+    self.llm = llm
+
+  @doc({
+      "description": "タスクを終了しても良いかどうかを確認します。また残タスクがある場合は次のタスクを指示します。",
+      "args": {
+          "history": "今まで実行したことを箇条書きで記述します。",
+          "additional_info": "レビューする際に必要な追加情報1000文字程度(プロジェクト構成、目的、期待する結果、ファイルの中身など)",
+      },
+      "returns": "レビューの結果を文字列でかえします。",
+      "raises": {},
+  }) 
+  def review_task(self, goal:str, history: List[str], additional_info: str) -> str:
+    res = self.llm.chat(f"Please check task is complete. \n ゴール: \n{goal}\n\n やったこと: \n {history} \n\n additional info: {additional_info}")
+    return res
+
+class Planner:
+  def __init__(self, llm: Agent):
+    self.llm = llm
+
+  @doc({
+      "description": "ゴールを達成するために計画を立てます。計画はAIエージェントが実行します。計画はゴールを達成するためのサブゴールをいくつか設定することで行います。",
+      "args": {
+          "goal": "達成したいゴールを記述します。",
+      },
+      "returns": "ゴールをマークダウンの文字列でかえします",
+      "raises": {},
+  }) 
+  def planning(self, goal: str) -> str:
+    res = self.llm.chat(f"Please make sub goals to achieve this goal. \n goal: {goal}")
     return res

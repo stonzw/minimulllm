@@ -27,13 +27,16 @@ def doc(doc_dict: Dict[str, Any]):
             docstring += "Args:\n"
             for arg, desc in doc_dict["args"].items():
                 arg_type = type_hints.get(arg, "Unknown")
-                docstring += f"    {arg} ({arg_type.__name__}): {desc}\n"
+                # arg_type が str などの場合もあるので安全に __name__ を取り出す
+                arg_type_name = arg_type.__name__ if hasattr(arg_type, "__name__") else str(arg_type)
+                docstring += f"    {arg} ({arg_type_name}): {desc}\n"
         
         # 戻り値の説明
         if "returns" in doc_dict:
             return_type = type_hints.get("return", "Unknown")
+            return_type_name = return_type.__name__ if hasattr(return_type, "__name__") else str(return_type)
             docstring += "\nReturns:\n"
-            docstring += f"    {return_type.__name__}: {doc_dict['returns']}\n"
+            docstring += f"    {return_type_name}: {doc_dict['returns']}\n"
         
         # 例外の説明
         if "raises" in doc_dict:
@@ -45,6 +48,7 @@ def doc(doc_dict: Dict[str, Any]):
         func.__doc__ = docstring
         return func
     return decorator
+
 
 class LLMToolParser:
     """
@@ -180,7 +184,10 @@ class LLMToolParser:
                 raise ValueError(f"引数 '{param}' は関数 '{name}' に存在しません。")
 
     @staticmethod
-    def generate_parameters(func: Callable, type_hints: Optional[Dict[str, Any]] = None) -> Dict[str, Dict[str, Any]]:
+    def generate_parameters(
+        func: Callable,
+        type_hints: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Dict[str, Any]]:
         """
         型ヒントとdocstringから引数の詳細情報を生成する。
 
@@ -208,7 +215,7 @@ class LLMToolParser:
             # 引数の説明を初期化(型ヒントのみ)
             param_description = f"{param}: {LLMToolParser.get_type_name(param_type)}"
 
-            # docstringから引数の説明を取得
+            # docstring から引数の説明を取得
             if func.__doc__:
                 doc_lines = func.__doc__.splitlines()
                 for line in doc_lines:
@@ -217,10 +224,19 @@ class LLMToolParser:
                         param_description = line.strip()
                         break
 
-            parameters[param] = {
-                "type": json_schema_type,
-                "description": param_description,
-            }
+            # 文字列の場合は "type": "string" のように入れる
+            # 辞書の場合 (例: {"type": "array", "items": ...}) はそれを丸ごと使う
+            param_schema: Dict[str, Any] = {"description": param_description}
+            if isinstance(json_schema_type, str):
+                # プリミティブ型の場合 ("string" / "number" / "boolean" / etc.)
+                param_schema["type"] = json_schema_type
+            elif isinstance(json_schema_type, dict):
+                # 配列やオブジェクトの場合
+                # {"type": "array", "items": ...} などをマージする
+                param_schema.update(json_schema_type)
+
+            parameters[param] = param_schema
+
         return parameters
 
     @staticmethod
@@ -247,7 +263,7 @@ class LLMToolParser:
     def convert_python_type_to_json_schema_type(python_type: Any) -> Any:
         """
         Pythonの型をJSON Schemaの型または構造に変換する。
-        Returns には dict もしくは str を返す想定。
+        Returnsには dict もしくは str を返す想定。
         """
         type_origin = get_origin(python_type)
         type_args = get_args(python_type)
@@ -264,32 +280,49 @@ class LLMToolParser:
 
         # list, dict のようなコンテナ型
         if type_origin is list:
-            # 例: list[int]
+            # 例: list[int], list[dict[str, Any]] など
             if type_args:
                 item_type = LLMToolParser.convert_python_type_to_json_schema_type(type_args[0])
             else:
-                item_type = {}
-            return {"type": "array", "items": item_type}
+                # 型引数が指定されていない場合は「items: {}」として「なんでもOK」
+                return {
+                    "type": "array",
+                    "items": {}
+                }
+
+            if isinstance(item_type, str):
+                # 要素型がプリミティブのとき → e.g. {"type": "array", "items": {"type": "string"}}
+                return {
+                    "type": "array",
+                    "items": {"type": item_type}
+                }
+            elif isinstance(item_type, dict):
+                # 要素型がさらに配列やオブジェクトなど複合型のとき
+                return {
+                    "type": "array",
+                    "items": item_type
+                }
+            # 他パターン(Unionなど)は既に別途エラーにしているので省略
+
         elif type_origin is dict:
             # 例: dict[str, int]
             if len(type_args) == 2:
                 key_type, value_type = type_args
-                # JSON Schema では key が string であることが多いが、
-                # Python の dict は key が str と限らないので注意 (今回は単純化)
+                # key を string と断定するなど簡略化
                 return {
                     "type": "object",
                     "additionalProperties": LLMToolParser.convert_python_type_to_json_schema_type(value_type),
                 }
             else:
+                # dict[...] だが型引数が足りないなど
                 return {"type": "object"}
 
         # それ以外の Union 型 (Optional 以外)
         if type_origin is Union:
-            # Optional[T] 以外の Union は未サポートとしてエラー
+            # Optional[T] 以外の Union はサポート外
             raise ValueError(f"サポートされていない複数Unionです: {python_type}")
 
-        # 何らかのクラス型など
-        # ここではサポート対象外としてエラーにする
+        # クラス型など、それ以外はサポート外
         raise ValueError(f"サポートされていない型です: {python_type}")
 
     @staticmethod
@@ -341,6 +374,7 @@ class LLMToolParser:
         if isinstance(typ, type):
             return typ.__name__
         return str(typ)
+
 
 class LLMToolManager:
     def __init__(self):
@@ -407,4 +441,3 @@ class LLMToolManager:
 
         # 引数を関数に渡して実行
         return func(**arguments)
-

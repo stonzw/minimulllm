@@ -6,28 +6,34 @@ from src.async_client import DeepSeekToolUse, OpenAIToolUse
 from src.client import OpenAI as OpenAISync
 from src.prompt import TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT
 from src.type import Agent
-from src.tools import explore_directory, search_in_files, file_read, file_write, complete, Reviewer
+from src.tools import explore_directory, search_in_files, file_read, file_write, complete, make_dirs, user_input, Planner, CodeReviewer, TaskReviewer
 from src.function_call import LLMToolManager
 
-async def code_generate(coder: Agent, reviewer: Reviewer, goal: str, max_steps: int):
+async def code_generate(coder: Agent, planner: Planner, code_reviewer: CodeReviewer, task_reviewer: TaskReviewer, goal: str, max_steps: int):
   tool_manager = LLMToolManager()
   tool_manager.register(file_write)
   tool_manager.register(file_read)
   tool_manager.register(explore_directory)
   tool_manager.register(search_in_files)
   tool_manager.register(complete)
-  tool_manager.register(reviewer.review_code)
+  tool_manager.register(make_dirs)
+  tool_manager.register(user_input)
+  tool_manager.register(planner.planning)
+  tool_manager.register(code_reviewer.review_code)
+  tool_manager.register(task_reviewer.review_task)
   next_prompt = goal
   for i in range(max_steps):
     print(i)
     if i % 5 == 1:
-      res = await coder.chat("状況を整理して計画を建ててください。詰まっていたら大胆に計画を修正してください。")
+      res = await coder.chat("状況を整理して計画を建ててください。詰まっていたら大胆に計画を修正してください。計画はplaningで")
     print(next_prompt)
     res = await coder.tool(next_prompt, tool_manager.tools)
     print(res)
     function_calls = res.choices[0].message.tool_calls
     if function_calls is None:
-      next_prompt = "function cannot call.If finish task call complete, not finish task call next function."
+      print(res.choices[0].message.content)
+      # next_prompt = "function cannot call.If finish task call complete, not finish task call next function."
+      next_prompt = input("指示を入力: ")
     else:
       for f in function_calls:
         print("実行する関数:")
@@ -63,7 +69,7 @@ async def main():
       return string[:max_length - 3] + "\n output is too long ..."
     return string
 
-  reviewer = Reviewer(o1_engineer)
+  reviewer = CodeReviewer(o1_engineer)
   goal = "I want to create a function that reads a file and returns the content as a string."
   res = await code_generate(engineer, reviewer, goal, 100)
 
