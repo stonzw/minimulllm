@@ -41,6 +41,7 @@ async def code_generate(coder: DeepSeekToolUse, planner: Planner, code_reviewer:
     if function_calls is None:
       print(res.choices[0].message.content)
       # next_prompt = "function cannot call.If finish task call complete, not finish task call next function."
+      coder.pop_message()
       next_prompt = input("指示を入力: ")
     else:
       for f in function_calls:
@@ -70,6 +71,7 @@ async def code_generate(coder: DeepSeekToolUse, planner: Planner, code_reviewer:
             coder.pop_message()
             next_prompt = f"Error following: {e}"
         else:
+          coder.pop_message()
           next_prompt = yN
 
 
