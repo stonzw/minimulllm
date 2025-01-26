@@ -124,7 +124,7 @@ class DeepSeekToolUse(DeepSeek):
             messages=self._messages,
             tools=tools
         )
-        self._messages.append({"role": "assistant", "content": response.choices[0].message.content})
+        self._messages.append(response.choices[0].message.model_dump())
         return response
 
 class Anthropic(Agent):

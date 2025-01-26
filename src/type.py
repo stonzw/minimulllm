@@ -41,6 +41,11 @@ class Agent(ABC):
         """
         pass
 
+    def append_message(self, message: Dict):
+        self._messages.append(message)
+    def pop_message(self):
+        self._messages.pop()
+
 class CodeGenerator(Agent):
     @abstractmethod
     def code(self, message: str)->Command:
