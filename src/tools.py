@@ -2,7 +2,7 @@ import os
 import fnmatch
 from typing import List, Dict, Any
 
-from minimulllm.src.type import Agent
+from .type import Agent
 from .function_call import doc
 
 
