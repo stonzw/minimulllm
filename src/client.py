@@ -1,3 +1,4 @@
+import os
 import openai
 import anthropic
 import google.generativeai as genai
@@ -6,7 +7,7 @@ from pydantic import BaseModel
 
 from .prompt import JSON_PARSER_PROMPT
 from .type import Command, Agent, Message, CodeGenerator
-from .secret import OPENAI_API_KEY, DEEP_SEEK_API_KEY
+from .secret import OPENAI_API_KEY, DEEP_SEEK_API_KEY, GEMINI_API_KEY
 
 
 def call_openai_structured_api(model: str, messages: List[dict], response_format: BaseModel):
@@ -192,20 +193,18 @@ class CodeGeneratorAnthropic(Anthropic):
         return response.choices[0].message.parsed
 
 class Gemini(Agent):
-
     def __init__(self, model, system_prompt):
         self.model = genai.GenerativeModel(
             model_name=model,
-            system_instruction=system_prompt
+            system_instruction=system_prompt,
+            api_key=os.environ.get("GEMINI_API_KEY")
         )
         self.system_prompt = system_prompt
         self._messages = []
 
     def chat(self, message) -> str:
         self._messages.append({"role": "user", "content": message})
-        
         response = self.model.generate_content(message)
-        
         response_text = response.text
         self._messages.append({"role": "assistant", "content": response_text})
         return response_text
@@ -222,7 +221,11 @@ class Gemini(Agent):
 class CodeGeneratorGemini(Gemini):
     def code(self, message) -> Optional[Command]:
         self.chat(message)
-        openai.api_key = OPENAI_API_KEY
+        
+        openai.api_key = GEMINI_API_KEY
+        if not openai.api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is not set")
+            
         raw_message = self.messages[-1].content
         messages = [
             {"role": "system", "content": JSON_PARSER_PROMPT},
@@ -230,7 +233,5 @@ class CodeGeneratorGemini(Gemini):
         ]
         response = call_openai_structured_api("gpt-4o-mini", messages, Command)
         return response.choices[0].message.parsed
-
-
 
 
