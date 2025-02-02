@@ -18,20 +18,28 @@ def call_openai_structured_api(model: str, messages: List[dict], response_format
     )
     return response
 class OpenAI(Agent):
-    def __init__(self, model, system_prompt):
+    def __init__(self, model, system_prompt, reasoning_effort=None):
         self.model = model
         self.system_prompt = system_prompt
         self._messages = [{"role": "system", "content": system_prompt}]
         # OpenAI 用に仮想的に用意された "async" 版インターフェースを想定
         self.client = openai.OpenAI(api_key=OPENAI_API_KEY)
+        self.reasoning_effort = reasoning_effort
 
     def chat(self, message) -> str:
         self._messages.append({"role": "user", "content": message})
-        # 非同期版
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=self._messages,
-        )
+        if self.reasoning_effort is None:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=self._messages,
+            )
+        else:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=self._messages,
+                reasoning_effort=self.reasoning_effort
+            )
+
         self._messages.append({
             "role": "assistant",
             "content": response.choices[0].message.content

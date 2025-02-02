@@ -82,7 +82,7 @@ async def main():
   # qa_ds = DeepSeek("deepseek-chat", OPEN_INTERPRETER_SYSTEM_PROMPT)
   qa_ds = DeepSeekToolUse("o1", TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT)
   o1_engineer = OpenAISync("o1", TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT)
-  o3_mini_engineer = OpenAISync("o3-mini", TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT)
+  o3_mini_engineer = OpenAISync("o3-mini", TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT, "high")
   r1_engineer = DeepSeekSync("deepseek-reasoner", TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT)
   r1_deep_seek_engineer = DeepSeekToolUse("deepseek-reasoner", TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT)
   engineer = deep_seek_engineer
