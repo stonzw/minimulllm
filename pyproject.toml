@@ -9,7 +9,10 @@ description = ""
 requires-python = ">=3.10"
 authors = [{ name = "stonzw" }]
 dependencies = [
+    "aiohttp>=3.11.11",
     "anthropic>=0.42.0",
+    "google-generativeai>=0.8.4",
+    "jupyter>=1.1.1",
     "openai>=1.59.3",
     "pydantic>=2.10.4",
     "python-dotenv>=1.0.1",
