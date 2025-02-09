@@ -2,7 +2,7 @@ import asyncio
 import json
 from src.client import DeepSeek as DeepSeekSync
 from src.client import OpenAI as OpenAISync
-from src.prompt import TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT
+from src.prompt import TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT, TASK_RUNNNER
 from src.type import Agent
 from src.tools import explore_directory, search_in_files, file_read, file_write, complete, make_dirs, user_input, Planner, CodeReviewer, TaskReviewer
 from src.function_call import LLMToolManager
@@ -77,25 +77,27 @@ async def code_generate(coder: DeepSeekToolUse, planner: Planner, code_reviewer:
 
 async def main():
   deep_seek_engineer = DeepSeekToolUse("deepseek-chat", TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT)
-  gpt_4o_engineer = OpenAIToolUse("gpt-4o", TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT)
+  gpt_4o_engineer = OpenAIToolUse("gpt-4o", TASK_RUNNNER)
   # gemini_engineer =GeminiToolUse("gemini-1.5-flash", TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT)
   # qa_ds = DeepSeek("deepseek-chat", OPEN_INTERPRETER_SYSTEM_PROMPT)
   qa_ds = DeepSeekToolUse("o1", TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT)
   o1_engineer = OpenAISync("o1", TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT)
-  o3_mini_engineer = OpenAISync("o3-mini", TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT, "high")
+  o3_mini_reviwer = OpenAISync("o3-mini", TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT, "high")
+  o3_mini_engineer = OpenAIToolUse("o3-mini", TASK_RUNNNER, "medium")
   r1_engineer = DeepSeekSync("deepseek-reasoner", TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT)
   r1_deep_seek_engineer = DeepSeekToolUse("deepseek-reasoner", TOP_LEVEL_SOFTWARE_ENGINEER_SYSTEM_PROMPT)
   engineer = deep_seek_engineer
   engineer = gpt_4o_engineer
+  engineer = o3_mini_engineer
+  # engineer = gpt_4o_engineer
   # engineer = gemini_engineer
   planner = Planner(r1_engineer)
-  planner = Planner(o3_mini_engineer)
+  planner = Planner(o3_mini_reviwer)
   code_reviewer = CodeReviewer(r1_engineer)
   task_reviewer = TaskReviewer(r1_deep_seek_engineer)
   task_reviewer = TaskReviewer(o3_mini_engineer)
-  goal = "/home/onzw/python/mimimulllm/example.pyをコマンドラインから設定値を受け取れるようにして。別ファイルで作成"
+  goal =  "/home/onzw/python/chart/task/todo/を確認してやるべきタスクをすすめてください。"
   res = await code_generate(engineer, planner, code_reviewer, task_reviewer, goal, 100)
-    
 
 if __name__ == "__main__":
     asyncio.run(main())
