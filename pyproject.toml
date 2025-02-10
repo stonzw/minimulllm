@@ -26,5 +26,6 @@ py-modules = ["src"]
 
 [dependency-groups]
 dev = [
+    "build>=1.2.2.post1",
     "ruff>=0.8.6",
 ]
