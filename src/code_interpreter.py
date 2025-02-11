@@ -1,8 +1,5 @@
 from typing import Callable, Dict, Any
 from code import InteractiveInterpreter
-from function_call import LLMToolManager
-import io
-import sys
 
 class CodeInterpreter:
     """
@@ -43,6 +40,7 @@ class CodeInterpreter:
         self.history.append(result)
         return result
 if __name__ == "__main__":
+    from function_call import LLMToolManager
     # Example initial tools setup for the agent
     def multiply_by_two(x: int) -> int:
         """
