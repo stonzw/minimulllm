@@ -379,7 +379,7 @@ class LLMToolParser:
 class LLMToolManager:
     def __init__(self):
         self.tools = []  # 登録されたツールのJSON Schemaを保持
-        self._func = dict()  # 登録された関数を保持
+        self.functions = dict()  # 登録された関数を保持
 
     def register(
         self,
@@ -406,8 +406,8 @@ class LLMToolManager:
         schema = LLMToolParser.parse_func(func, name, description, required, parameters)
 
         # 関数を登録
-        func_name = name if name is not None else func.__name__
-        self._func[func_name] = func
+        func_name = name if name is not None else func.__qualname__
+        self.functions[func_name] = func
 
         # JSON Schemaをツールリストに追加
         self.tools.append(schema)
@@ -433,11 +433,11 @@ class LLMToolManager:
         arguments = json.loads(res.arguments)
 
         # 関数が登録されているか確認
-        if func_name not in self._func:
+        if func_name not in self.functions:
             raise ValueError(f"関数 '{func_name}' は登録されていません。")
 
         # 関数を取得
-        func = self._func[func_name]
+        func = self.functions[func_name]
 
         # 引数を関数に渡して実行
         return func(**arguments)
