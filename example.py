@@ -94,8 +94,9 @@ async def main():
   planner = Planner(r1_engineer)
   planner = Planner(o3_mini_reviwer)
   code_reviewer = CodeReviewer(r1_engineer)
+  code_reviewer = CodeReviewer(o3_mini_reviwer)
   task_reviewer = TaskReviewer(r1_deep_seek_engineer)
-  task_reviewer = TaskReviewer(o3_mini_engineer)
+  task_reviewer = TaskReviewer(o3_mini_reviwer)
   goal =  "/home/onzw/python/chart/task/todo/を確認してやるべきタスクをすすめてください。"
   res = await code_generate(engineer, planner, code_reviewer, task_reviewer, goal, 100)
 
