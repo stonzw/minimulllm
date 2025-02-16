@@ -87,9 +87,9 @@ class LLMToolParser:
         # 型ヒントの取得
         type_hints = get_type_hints(func)
 
-        # 名前を設定（省略時は関数の__name__を使用）
+        # 名前を設定（省略時は関数の__qualname__を使用）
         if name is None:
-            name = func.__name__
+            name = func.__qualname__
 
         # 説明を設定（省略時はdocstringを使用）
         if description is None:
@@ -145,12 +145,12 @@ class LLMToolParser:
 
         # 引数のバリデーション
         if parameters is not None:
-            LLMToolParser.validate_parameters(parameters, type_hints, func.__name__)
+            LLMToolParser.validate_parameters(parameters, type_hints, func.__qualname__)
 
         # 必須引数のバリデーション
         if required is not None:
             all_params = [p for p in type_hints.keys() if p != "return"]
-            LLMToolParser.validate_required(required, all_params, func.__name__)
+            LLMToolParser.validate_required(required, all_params, func.__qualname__)
 
     @staticmethod
     def validate_function(func: Callable) -> None:
@@ -163,9 +163,9 @@ class LLMToolParser:
         """型ヒントが存在するか確認する。"""
         type_hints = get_type_hints(func)
         if not type_hints:
-            raise TypeError(f"関数に型ヒントがありません: {func.__name__}")
+            raise TypeError(f"関数に型ヒントがありません: {func.__qualname__}")
         if "return" not in type_hints:
-            raise TypeError(f"関数に戻り値の型ヒントがありません: {func.__name__}")
+            raise TypeError(f"関数に戻り値の型ヒントがありません: {func.__qualname__}")
         return type_hints
 
     @staticmethod
